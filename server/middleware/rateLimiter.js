@@ -1,6 +1,6 @@
 import rateLimit from 'express-rate-limit';
 
-const ANONYMOUS_EXECUTIONS_PER_HOUR = 3;
+const ANONYMOUS_EXECUTIONS_PER_HOUR = 3000; // Increased for local testing
 
 export const anonymousExecutionLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour

@@ -15,10 +15,17 @@ export const executeCode = async (language, code, input) => {
   try {
     await fs.mkdir(tempDir, { recursive: true });
     
-    if (language === 'cpp') {
-      return await executeCpp(code, input, tempDir, runId);
-    } else {
-      throw new Error(`Language ${language} is not supported yet.`);
+    switch (language) {
+      case 'cpp':
+        return await executeCpp(code, input, tempDir);
+      case 'python':
+        return await executePython(code, input, tempDir);
+      case 'javascript':
+        return await executeJavaScript(code, input, tempDir);
+      case 'java':
+        return await executeJava(code, input, tempDir);
+      default:
+        throw new Error(`Language ${language} is not supported yet.`);
     }
   } catch (error) {
     return {
@@ -37,23 +44,12 @@ export const executeCode = async (language, code, input) => {
   }
 };
 
-const executeCpp = async (code, input, tempDir, runId) => {
-  const sourceFile = path.join(tempDir, 'main.cpp');
-  const inputFile = path.join(tempDir, 'input.txt');
-
-  await fs.writeFile(sourceFile, code);
-  await fs.writeFile(inputFile, input || '');
-
-  // Convert Windows path to Docker-friendly path if necessary
+const runDockerContainer = async (tempDir, dockerImage, runCommand, startTime) => {
   const normalizedTempDir = process.platform === 'win32' 
     ? tempDir.replace(/\\/g, '/')
     : tempDir;
 
-  const startTime = Date.now();
-  
   return await new Promise((resolve) => {
-    // Run Docker container with gcc:latest
-    // Mount tempDir, compile, and run with input
     const dockerArgs = [
       'run', '--rm',
       '--network', 'none', // Disable network access for security
@@ -61,15 +57,14 @@ const executeCpp = async (code, input, tempDir, runId) => {
       '--cpus', '1', // Limit CPU
       '-v', `${normalizedTempDir}:/usr/src/app`,
       '-w', '/usr/src/app',
-      'gcc:latest',
-      'sh', '-c', 'g++ main.cpp -o main -O2 && ./main < input.txt'
+      dockerImage,
+      'sh', '-c', runCommand
     ];
 
     const runProcess = spawn('docker', dockerArgs);
     let output = '';
     let errorOutput = '';
 
-    // Handle timeout
     const timeout = setTimeout(() => {
       runProcess.kill('SIGKILL');
       resolve({
@@ -103,7 +98,6 @@ const executeCpp = async (code, input, tempDir, runId) => {
       if (signal === 'SIGKILL') return;
 
       if (code !== 0) {
-        // If it's a compilation error or runtime error
         resolve({
           success: false,
           output,
@@ -120,4 +114,44 @@ const executeCpp = async (code, input, tempDir, runId) => {
       }
     });
   });
+};
+
+const executeCpp = async (code, input, tempDir) => {
+  const sourceFile = path.join(tempDir, 'main.cpp');
+  const inputFile = path.join(tempDir, 'input.txt');
+  await fs.writeFile(sourceFile, code);
+  await fs.writeFile(inputFile, input || '');
+
+  const runCommand = 'g++ main.cpp -o main -O2 && ./main < input.txt';
+  return await runDockerContainer(tempDir, 'gcc:latest', runCommand, Date.now());
+};
+
+const executePython = async (code, input, tempDir) => {
+  const sourceFile = path.join(tempDir, 'main.py');
+  const inputFile = path.join(tempDir, 'input.txt');
+  await fs.writeFile(sourceFile, code);
+  await fs.writeFile(inputFile, input || '');
+
+  const runCommand = 'python main.py < input.txt';
+  return await runDockerContainer(tempDir, 'python:3.9-slim', runCommand, Date.now());
+};
+
+const executeJavaScript = async (code, input, tempDir) => {
+  const sourceFile = path.join(tempDir, 'main.js');
+  const inputFile = path.join(tempDir, 'input.txt');
+  await fs.writeFile(sourceFile, code);
+  await fs.writeFile(inputFile, input || '');
+
+  const runCommand = 'node main.js < input.txt';
+  return await runDockerContainer(tempDir, 'node:18-alpine', runCommand, Date.now());
+};
+
+const executeJava = async (code, input, tempDir) => {
+  const sourceFile = path.join(tempDir, 'Main.java');
+  const inputFile = path.join(tempDir, 'input.txt');
+  await fs.writeFile(sourceFile, code);
+  await fs.writeFile(inputFile, input || '');
+
+  const runCommand = 'javac Main.java && java Main < input.txt';
+  return await runDockerContainer(tempDir, 'eclipse-temurin:17-jdk', runCommand, Date.now());
 };
