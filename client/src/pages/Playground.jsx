@@ -5,6 +5,7 @@ import InputOutputPanel from '../components/InputOutputPanel';
 import AIChat from '../components/AIChat';
 import ConvertModal from '../components/ConvertModal';
 import { Play, Send, GitCompare } from 'lucide-react';
+import { runCode } from '../services/api';
 
 export default function Playground() {
   const [code, setCode] = useState('#include <iostream>\n\nint main() {\n    std::cout << "Hello, World!" << std::endl;\n    return 0;\n}');
@@ -13,6 +14,24 @@ export default function Playground() {
   const [output, setOutput] = useState('');
   const [showChat, setShowChat] = useState(false);
   const [showConvertModal, setShowConvertModal] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
+
+  const handleRunCode = async () => {
+    setIsRunning(true);
+    setOutput('Running...\n');
+    try {
+      const response = await runCode(language, code, input);
+      if (response.success) {
+        setOutput(response.output || '');
+      } else {
+        setOutput(response.error || 'Execution failed.');
+      }
+    } catch (err) {
+      setOutput(`Error: ${err.message}`);
+    } finally {
+      setIsRunning(false);
+    }
+  };
 
   return (
     <div className="relative flex h-full w-full overflow-hidden">
@@ -53,9 +72,13 @@ export default function Playground() {
               <Send size={14} />
               Ask AI
             </button>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[#238636] border border-[rgba(240,246,252,0.1)] rounded-md hover:bg-[#2ea043] transition-all text-white font-medium ml-2">
+            <button 
+              onClick={handleRunCode}
+              disabled={isRunning}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm ${isRunning ? 'bg-[#1b5e20]' : 'bg-[#238636] hover:bg-[#2ea043]'} border border-[rgba(240,246,252,0.1)] rounded-md transition-all text-white font-medium ml-2`}
+            >
               <Play size={14} fill="currentColor" />
-              Run
+              {isRunning ? 'Running...' : 'Run'}
             </button>
           </div>
         </div>
@@ -71,7 +94,7 @@ export default function Playground() {
         </div>
       </div>
 
-      {showChat && <AIChat onClose={() => setShowChat(false)} />}
+      {showChat && <AIChat onClose={() => setShowChat(false)} codeContext={code} />}
       <ConvertModal 
         isOpen={showConvertModal} 
         onClose={() => setShowConvertModal(false)}

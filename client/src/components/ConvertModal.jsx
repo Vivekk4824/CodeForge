@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, GitCompare } from 'lucide-react';
+import { convertCode as convertCodeApi } from '../services/api';
 
 export default function ConvertModal({ isOpen, onClose, currentLanguage, code, setCode }) {
   const [targetLanguage, setTargetLanguage] = useState(currentLanguage === 'cpp' ? 'java' : 'cpp');
@@ -11,14 +12,16 @@ export default function ConvertModal({ isOpen, onClose, currentLanguage, code, s
   const handleConvert = async () => {
     setIsConverting(true);
     try {
-      // Fake API call for now. Need to wire with backend.
-      // const res = await fetch('/api/ai/convert', { ... })
-      setTimeout(() => {
-        setConvertedCode('// Converted code will appear here\n' + code);
-        setIsConverting(false);
-      }, 1000);
+      const response = await convertCodeApi(currentLanguage, targetLanguage, code);
+      if (response.success) {
+        setConvertedCode(response.code);
+      } else {
+        setConvertedCode(`// Error: ${response.message || 'Conversion failed'}`);
+      }
     } catch (error) {
       console.error(error);
+      setConvertedCode(`// Error: ${error.message}`);
+    } finally {
       setIsConverting(false);
     }
   };

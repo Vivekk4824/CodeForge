@@ -1,17 +1,33 @@
 import React, { useState } from 'react';
-import { X, Send } from 'lucide-react';
+import { X, Send, Loader } from 'lucide-react';
+import { chatWithAI } from '../services/api';
 
-export default function AIChat({ onClose }) {
+export default function AIChat({ onClose, codeContext }) {
   const [messages, setMessages] = useState([
     { role: 'ai', text: 'Hi! I am your AI coding assistant. How can I help you with your code today?' }
   ]);
   const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
-    setMessages(prev => [...prev, { role: 'user', text: input }]);
-    // TODO: Connect to backend API
+  const handleSend = async () => {
+    if (!input.trim() || isLoading) return;
+    
+    const userMessage = input.trim();
+    setMessages(prev => [...prev, { role: 'user', text: userMessage }]);
     setInput('');
+    setIsLoading(true);
+
+    try {
+      // Pass the previous messages as history (excluding the first greeting if desired, or keep it)
+      const history = messages.filter(m => m.role !== 'system'); 
+      const response = await chatWithAI({ code: codeContext }, history, userMessage);
+      
+      setMessages(prev => [...prev, { role: 'ai', text: response.text }]);
+    } catch (error) {
+      setMessages(prev => [...prev, { role: 'ai', text: `Error: ${error.message}` }]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -38,6 +54,13 @@ export default function AIChat({ onClose }) {
             </div>
           </div>
         ))}
+        {isLoading && (
+          <div className="flex justify-start">
+            <div className="max-w-[85%] rounded-lg p-3 text-sm bg-[#21262d] border border-[#30363d] text-[#8b949e] flex items-center gap-2">
+              <Loader className="animate-spin" size={16} /> Thinking...
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="p-4 border-t border-[#30363d] bg-[#0d1117]">
@@ -52,7 +75,8 @@ export default function AIChat({ onClose }) {
           />
           <button 
             onClick={handleSend}
-            className="absolute right-2 text-[#8b949e] hover:text-[#58a6ff] transition-colors p-1"
+            disabled={isLoading}
+            className={`absolute right-2 p-1 transition-colors ${isLoading ? 'text-[#30363d]' : 'text-[#8b949e] hover:text-[#58a6ff]'}`}
           >
             <Send size={16} />
           </button>
