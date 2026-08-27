@@ -3,18 +3,51 @@ import fs from 'fs/promises';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import os from 'os';
+import axios from 'axios';
 
 // Configurable limits
 const EXECUTION_TIMEOUT = 5000; // 5 seconds
 const MAX_BUFFER = 1024 * 1024; // 1MB
 
-export const executeCode = async (language, code, input) => {
+// Executor pool service configuration
+const EXECUTOR_HOST = process.env.EXECUTOR_HOST || 'localhost';
+const EXECUTOR_PORT = process.env.EXECUTOR_PORT || 6000;
+const EXECUTOR_URL = `http://${EXECUTOR_HOST}:${EXECUTOR_PORT}`;
+const USE_POOL = process.env.USE_EXECUTOR_POOL === 'true';
+
+/**
+ * Execute code using the warm pooled executor service
+ * This routes to containerized executors that are kept warm for faster execution
+ */
+export const executeCodeWithPool = async (language, code, input) => {
+  try {
+    // Route to executor pool service
+    const response = await axios.post(`${EXECUTOR_URL}/execute`, {
+      language,
+      code,
+      input: input || ''
+    }, {
+      timeout: EXECUTION_TIMEOUT + 1000
+    });
+
+    return response.data;
+  } catch (error) {
+    console.error('Executor pool error:', error.message);
+    // Fallback to direct execution
+    return await executeCodeDirect(language, code, input);
+  }
+};
+
+/**
+ * Direct execution (fallback if pool is unavailable)
+ */
+export const executeCodeDirect = async (language, code, input) => {
   const runId = uuidv4();
   const tempDir = path.join(os.tmpdir(), `ai-coding-platform-${runId}`);
-  
+
   try {
     await fs.mkdir(tempDir, { recursive: true });
-    
+
     switch (language) {
       case 'cpp':
         return await executeCpp(code, input, tempDir);
@@ -35,7 +68,6 @@ export const executeCode = async (language, code, input) => {
       executionTime: 0
     };
   } finally {
-    // Cleanup temporary directory
     try {
       await fs.rm(tempDir, { recursive: true, force: true });
     } catch (e) {
@@ -44,17 +76,28 @@ export const executeCode = async (language, code, input) => {
   }
 };
 
+/**
+ * Main execution function - routes to pool or direct based on configuration
+ */
+export const executeCode = async (language, code, input) => {
+  if (USE_POOL) {
+    return await executeCodeWithPool(language, code, input);
+  } else {
+    return await executeCodeDirect(language, code, input);
+  }
+};
+
 const runDockerContainer = async (tempDir, dockerImage, runCommand, startTime) => {
-  const normalizedTempDir = process.platform === 'win32' 
+  const normalizedTempDir = process.platform === 'win32'
     ? tempDir.replace(/\\/g, '/')
     : tempDir;
 
   return await new Promise((resolve) => {
     const dockerArgs = [
       'run', '--rm',
-      '--network', 'none', // Disable network access for security
-      '--memory', '256m', // Limit memory
-      '--cpus', '1', // Limit CPU
+      '--network', 'none',
+      '--memory', '256m',
+      '--cpus', '1',
       '-v', `${normalizedTempDir}:/usr/src/app`,
       '-w', '/usr/src/app',
       dockerImage,
@@ -94,7 +137,7 @@ const runDockerContainer = async (tempDir, dockerImage, runCommand, startTime) =
 
     runProcess.on('close', (code, signal) => {
       clearTimeout(timeout);
-      
+
       if (signal === 'SIGKILL') return;
 
       if (code !== 0) {

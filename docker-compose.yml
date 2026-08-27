@@ -1,0 +1,251 @@
+version: '3.9'
+
+services:
+  # =========================================================================
+  # MongoDB Database
+  # =========================================================================
+  mongodb:
+    image: mongo:7-alpine
+    container_name: codeforge-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: ai-coding-platform
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - codeforge-network
+
+  # =========================================================================
+  # Backend API Server (with embedded Frontend)
+  # =========================================================================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: backend-prod
+    container_name: codeforge-backend
+    ports:
+      - "5000:5000"
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      MONGODB_URI: mongodb://mongodb:27017/ai-coding-platform
+      JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_change_me}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-your_gemini_api_key}
+      EXECUTOR_POOL_SIZE: 3
+      EXECUTOR_HOST: executor-pool-manager
+      EXECUTOR_PORT: 6000
+      DOCKER_HOST: unix:///var/run/docker.sock
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      executor-pool-manager:
+        condition: service_started
+    volumes:
+      # Mount Docker socket for container management
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Shared temp directory for code execution
+      - executor_temp:/tmp/codeforge
+    networks:
+      - codeforge-network
+    restart: unless-stopped
+
+  # =========================================================================
+  # Executor Pool Manager (manages warm container pools)
+  # =========================================================================
+  executor-pool-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile.pool-manager
+    container_name: codeforge-executor-pool-manager
+    environment:
+      POOL_SIZE: 3
+      CPP_IMAGE: codeforge:cpp-executor
+      PYTHON_IMAGE: codeforge:python-executor
+      JS_IMAGE: codeforge:js-executor
+      JAVA_IMAGE: codeforge:java-executor
+    volumes:
+      # Docker socket access for container spawning
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Shared temp directory
+      - executor_temp:/tmp/codeforge
+    networks:
+      - codeforge-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # =========================================================================
+  # C++ Executor Container (Pre-warmed Pool)
+  # =========================================================================
+  cpp-executor-1:
+    image: codeforge:cpp-executor
+    container_name: codeforge-cpp-executor-1
+    entrypoint: ["sh", "-c", "while true; do sleep 3600; done"]
+    volumes:
+      - executor_temp:/tmp/codeforge
+    networks:
+      - codeforge-network
+    mem_limit: 512m
+    cpus: '1.0'
+    restart: unless-stopped
+
+  cpp-executor-2:
+    image: codeforge:cpp-executor
+    container_name: codeforge-cpp-executor-2
+    entrypoint: ["sh", "-c", "while true; do sleep 3600; done"]
+    volumes:
+      - executor_temp:/tmp/codeforge
+    networks:
+      - codeforge-network
+    mem_limit: 512m
+    cpus: '1.0'
+    restart: unless-stopped
+
+  cpp-executor-3:
+    image: codeforge:cpp-executor
+    container_name: codeforge-cpp-executor-3
+    entrypoint: ["sh", "-c", "while true; do sleep 3600; done"]
+    volumes:
+      - executor_temp:/tmp/codeforge
+    networks:
+      - codeforge-network
+    mem_limit: 512m
+    cpus: '1.0'
+    restart: unless-stopped
+
+  # =========================================================================
+  # Python Executor Container (Pre-warmed Pool)
+  # =========================================================================
+  python-executor-1:
+    image: codeforge:python-executor
+    container_name: codeforge-python-executor-1
+    entrypoint: ["sh", "-c", "while true; do sleep 3600; done"]
+    volumes:
+      - executor_temp:/tmp/codeforge
+    networks:
+      - codeforge-network
+    mem_limit: 512m
+    cpus: '1.0'
+    restart: unless-stopped
+
+  python-executor-2:
+    image: codeforge:python-executor
+    container_name: codeforge-python-executor-2
+    entrypoint: ["sh", "-c", "while true; do sleep 3600; done"]
+    volumes:
+      - executor_temp:/tmp/codeforge
+    networks:
+      - codeforge-network
+    mem_limit: 512m
+    cpus: '1.0'
+    restart: unless-stopped
+
+  python-executor-3:
+    image: codeforge:python-executor
+    container_name: codeforge-python-executor-3
+    entrypoint: ["sh", "-c", "while true; do sleep 3600; done"]
+    volumes:
+      - executor_temp:/tmp/codeforge
+    networks:
+      - codeforge-network
+    mem_limit: 512m
+    cpus: '1.0'
+    restart: unless-stopped
+
+  # =========================================================================
+  # Node.js Executor Container (Pre-warmed Pool)
+  # =========================================================================
+  js-executor-1:
+    image: codeforge:js-executor
+    container_name: codeforge-js-executor-1
+    entrypoint: ["sh", "-c", "while true; do sleep 3600; done"]
+    volumes:
+      - executor_temp:/tmp/codeforge
+    networks:
+      - codeforge-network
+    mem_limit: 512m
+    cpus: '1.0'
+    restart: unless-stopped
+
+  js-executor-2:
+    image: codeforge:js-executor
+    container_name: codeforge-js-executor-2
+    entrypoint: ["sh", "-c", "while true; do sleep 3600; done"]
+    volumes:
+      - executor_temp:/tmp/codeforge
+    networks:
+      - codeforge-network
+    mem_limit: 512m
+    cpus: '1.0'
+    restart: unless-stopped
+
+  js-executor-3:
+    image: codeforge:js-executor
+    container_name: codeforge-js-executor-3
+    entrypoint: ["sh", "-c", "while true; do sleep 3600; done"]
+    volumes:
+      - executor_temp:/tmp/codeforge
+    networks:
+      - codeforge-network
+    mem_limit: 512m
+    cpus: '1.0'
+    restart: unless-stopped
+
+  # =========================================================================
+  # Java Executor Container (Pre-warmed Pool)
+  # =========================================================================
+  java-executor-1:
+    image: codeforge:java-executor
+    container_name: codeforge-java-executor-1
+    entrypoint: ["sh", "-c", "while true; do sleep 3600; done"]
+    volumes:
+      - executor_temp:/tmp/codeforge
+    networks:
+      - codeforge-network
+    mem_limit: 512m
+    cpus: '1.0'
+    restart: unless-stopped
+
+  java-executor-2:
+    image: codeforge:java-executor
+    container_name: codeforge-java-executor-2
+    entrypoint: ["sh", "-c", "while true; do sleep 3600; done"]
+    volumes:
+      - executor_temp:/tmp/codeforge
+    networks:
+      - codeforge-network
+    mem_limit: 512m
+    cpus: '1.0'
+    restart: unless-stopped
+
+  java-executor-3:
+    image: codeforge:java-executor
+    container_name: codeforge-java-executor-3
+    entrypoint: ["sh", "-c", "while true; do sleep 3600; done"]
+    volumes:
+      - executor_temp:/tmp/codeforge
+    networks:
+      - codeforge-network
+    mem_limit: 512m
+    cpus: '1.0'
+    restart: unless-stopped
+
+volumes:
+  mongodb_data:
+    driver: local
+  executor_temp:
+    driver: local
+
+networks:
+  codeforge-network:
+    driver: bridge

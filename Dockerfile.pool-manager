@@ -1,0 +1,11 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+RUN npm install --no-save express axios cors dotenv uuid
+
+COPY server/services/executorPool.js .
+
+EXPOSE 6000
+
+CMD ["node", "executorPool.js"]
