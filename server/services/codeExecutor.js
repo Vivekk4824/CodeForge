@@ -15,6 +15,13 @@ const EXECUTOR_PORT = process.env.EXECUTOR_PORT || 6000;
 const EXECUTOR_URL = `http://${EXECUTOR_HOST}:${EXECUTOR_PORT}`;
 const USE_POOL = process.env.USE_EXECUTOR_POOL === 'true';
 
+const RESOURCE_LIMITS = {
+  java: { memory: '512m', cpus: '2' },
+  cpp: { memory: '256m', cpus: '2' },
+  python: { memory: '128m', cpus: '1' },
+  javascript: { memory: '128m', cpus: '1' }
+};
+
 /**
  * Execute code using the warm pooled executor service
  * This routes to containerized executors that are kept warm for faster execution
@@ -77,13 +84,14 @@ export const executeCode = async (language, code, input) => {
   }
 };
 
-const runDockerContainer = async (dockerImage, runCommand, startTime) => {
+const runDockerContainer = async (dockerImage, runCommand, startTime, language) => {
+  const limits = RESOURCE_LIMITS[language] || { memory: '256m', cpus: '1' };
   return await new Promise((resolve) => {
     const dockerArgs = [
       'run', '--rm',
       '--network', 'none',
-      '--memory', '256m',
-      '--cpus', '1',
+      '--memory', limits.memory,
+      '--cpus', limits.cpus,
       dockerImage,
       'sh', '-c', runCommand
     ];
@@ -179,20 +187,20 @@ const runDockerContainer = async (dockerImage, runCommand, startTime) => {
 
 const executeCpp = async (code, input, startTime) => {
   const runCommand = `mkdir -p /tmp/run && cd /tmp/run && echo '${code.replace(/'/g, "'\\''")}' > main.cpp && g++ main.cpp -o main -O2 && ./main < <(echo '${(input||'').replace(/'/g, "'\\''")}')`;
-  return await runDockerContainer('gcc:latest', runCommand, startTime);
+  return await runDockerContainer('gcc:latest', runCommand, startTime, 'cpp');
 };
 
 const executePython = async (code, input, startTime) => {
   const runCommand = `mkdir -p /tmp/run && cd /tmp/run && echo '${code.replace(/'/g, "'\\''")}' > main.py && python main.py < <(echo '${(input||'').replace(/'/g, "'\\''")}')`;
-  return await runDockerContainer('python:3.9-slim', runCommand, startTime);
+  return await runDockerContainer('python:3.9-slim', runCommand, startTime, 'python');
 };
 
 const executeJavaScript = async (code, input, startTime) => {
   const runCommand = `mkdir -p /tmp/run && cd /tmp/run && echo '${code.replace(/'/g, "'\\''")}' > main.js && node main.js < <(echo '${(input||'').replace(/'/g, "'\\''")}')`;
-  return await runDockerContainer('node:18-alpine', runCommand, startTime);
+  return await runDockerContainer('node:18-alpine', runCommand, startTime, 'javascript');
 };
 
 const executeJava = async (code, input, startTime) => {
   const runCommand = `mkdir -p /tmp/run && cd /tmp/run && echo '${code.replace(/'/g, "'\\''")}' > Main.java && javac Main.java && java Main < <(echo '${(input||'').replace(/'/g, "'\\''")}')`;
-  return await runDockerContainer('eclipse-temurin:17-jdk', runCommand, startTime);
+  return await runDockerContainer('eclipse-temurin:17-jdk', runCommand, startTime, 'java');
 };

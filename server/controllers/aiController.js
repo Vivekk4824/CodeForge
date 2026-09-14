@@ -43,14 +43,36 @@ export const handleConvert = async (req, res) => {
   }
 };
 
+const autocompleteCache = new Map();
+const MAX_CACHE_SIZE = 200;
+
 // @desc    Get inline autocomplete
 // @route   POST /api/ai/autocomplete
 export const handleAutocomplete = async (req, res) => {
   const { language, problemText, prefix, suffix } = req.body;
 
+  const cacheKey = `${language}||${problemText}||${prefix}||${suffix}`;
+
+  if (autocompleteCache.has(cacheKey)) {
+    const cachedResult = autocompleteCache.get(cacheKey);
+    // Move to end (most recently used)
+    autocompleteCache.delete(cacheKey);
+    autocompleteCache.set(cacheKey, cachedResult);
+    return res.json({ success: true, completion: cachedResult, cached: true });
+  }
+
   try {
     const completion = await generateAutocomplete(language, problemText, prefix, suffix);
-    res.json({ success: true, completion });
+    
+    // Save to cache
+    autocompleteCache.set(cacheKey, completion);
+    if (autocompleteCache.size > MAX_CACHE_SIZE) {
+      // Remove oldest (first item in Map iteration order)
+      const oldestKey = autocompleteCache.keys().next().value;
+      autocompleteCache.delete(oldestKey);
+    }
+
+    res.json({ success: true, completion, cached: false });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

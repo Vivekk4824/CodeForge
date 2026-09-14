@@ -68,19 +68,27 @@ const getExecutorContainer = async (language) => {
   return containerId;
 };
 
+const RESOURCE_LIMITS = {
+  java: { memory: '512m', cpus: '2' },
+  cpp: { memory: '256m', cpus: '2' },
+  python: { memory: '128m', cpus: '1' },
+  javascript: { memory: '128m', cpus: '1' }
+};
+
 /**
  * Creates a new executor container
  */
 const createExecutorContainer = async (language) => {
   const containerId = `executor-${language}-${uuidv4().slice(0, 8)}`;
   const image = EXECUTORS[language].image;
+  const limits = RESOURCE_LIMITS[language] || { memory: '256m', cpus: '1' };
 
   const dockerArgs = [
     'run', '-d',
     '--name', containerId,
     '--network', 'codeforge-network',
-    '--memory', '256m',
-    '--cpus', '1',
+    '--memory', limits.memory,
+    '--cpus', limits.cpus,
     '-v', `${TEMP_DIR}:/usr/src/app`,
     '-w', '/usr/src/app',
     image,
