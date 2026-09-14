@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 
-export default function InputOutputPanel({ input, setInput, output }) {
+const InputOutputPanel = memo(function InputOutputPanel({ input, setInput, output }) {
   const [activeTab, setActiveTab] = useState('input');
 
   return (
@@ -54,4 +54,6 @@ export default function InputOutputPanel({ input, setInput, output }) {
       </div>
     </div>
   );
-}
+});
+
+export default InputOutputPanel;

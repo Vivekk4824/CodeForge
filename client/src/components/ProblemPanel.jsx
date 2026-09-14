@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 
-export default function ProblemPanel({ problemText, setProblemText }) {
-
+const ProblemPanel = memo(function ProblemPanel({ problemText, setProblemText }) {
   return (
     <div className="flex flex-col h-full">
       <div className="h-12 border-b border-[#30363d] flex items-center px-4 shrink-0 bg-[#161b22]">
@@ -18,4 +17,6 @@ export default function ProblemPanel({ problemText, setProblemText }) {
       </div>
     </div>
   );
-}
+});
+
+export default ProblemPanel;

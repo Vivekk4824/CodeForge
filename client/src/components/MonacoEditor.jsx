@@ -1,8 +1,8 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, memo } from 'react';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import { generateCode, getInlineCompletion } from '../services/api';
 
-export default function MonacoEditor({ code, setCode, language, problemText, aiCopilotEnabled }) {
+const MonacoEditor = memo(function MonacoEditor({ code, setCode, language, problemText, aiCopilotEnabled }) {
   const editorRef = useRef(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [localCode, setLocalCode] = useState(code);
@@ -166,4 +166,6 @@ export default function MonacoEditor({ code, setCode, language, problemText, aiC
       />
     </div>
   );
-}
+});
+
+export default MonacoEditor;

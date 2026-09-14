@@ -42,21 +42,17 @@ export const executeCodeWithPool = async (language, code, input) => {
  * Direct execution (fallback if pool is unavailable)
  */
 export const executeCodeDirect = async (language, code, input) => {
-  const runId = uuidv4();
-  const tempDir = path.join(os.tmpdir(), `ai-coding-platform-${runId}`);
-
+  const startTime = Date.now();
   try {
-    await fs.mkdir(tempDir, { recursive: true });
-
     switch (language) {
       case 'cpp':
-        return await executeCpp(code, input, tempDir);
+        return await executeCpp(code, input, startTime);
       case 'python':
-        return await executePython(code, input, tempDir);
+        return await executePython(code, input, startTime);
       case 'javascript':
-        return await executeJavaScript(code, input, tempDir);
+        return await executeJavaScript(code, input, startTime);
       case 'java':
-        return await executeJava(code, input, tempDir);
+        return await executeJava(code, input, startTime);
       default:
         throw new Error(`Language ${language} is not supported yet.`);
     }
@@ -65,14 +61,8 @@ export const executeCodeDirect = async (language, code, input) => {
       success: false,
       output: null,
       error: error.message,
-      executionTime: 0
+      executionTime: Date.now() - startTime
     };
-  } finally {
-    try {
-      await fs.rm(tempDir, { recursive: true, force: true });
-    } catch (e) {
-      console.error(`Failed to cleanup temp dir ${tempDir}:`, e);
-    }
   }
 };
 
@@ -87,64 +77,76 @@ export const executeCode = async (language, code, input) => {
   }
 };
 
-const runDockerContainer = async (tempDir, dockerImage, runCommand, startTime) => {
-  const normalizedTempDir = process.platform === 'win32'
-    ? tempDir.replace(/\\/g, '/')
-    : tempDir;
-
+const runDockerContainer = async (dockerImage, runCommand, startTime) => {
   return await new Promise((resolve) => {
     const dockerArgs = [
       'run', '--rm',
       '--network', 'none',
       '--memory', '256m',
       '--cpus', '1',
-      '-v', `${normalizedTempDir}:/usr/src/app`,
-      '-w', '/usr/src/app',
       dockerImage,
       'sh', '-c', runCommand
     ];
 
     const runProcess = spawn('docker', dockerArgs);
-    let output = '';
-    let errorOutput = '';
+    const outputChunks = [];
+    const errorChunks = [];
+    let outputLength = 0;
+    let errorLength = 0;
 
     const timeout = setTimeout(() => {
       runProcess.kill('SIGKILL');
       resolve({
         success: false,
-        output,
+        output: Buffer.concat(outputChunks).toString('utf8'),
         error: 'Time Limit Exceeded (TLE)',
         executionTime: Date.now() - startTime
       });
     }, EXECUTION_TIMEOUT);
 
     runProcess.stdout.on('data', (data) => {
-      if (output.length > MAX_BUFFER) return;
-      output += data.toString();
-      if (output.length > MAX_BUFFER) {
+      if (outputLength > MAX_BUFFER) return;
+      
+      if (outputLength + data.length > MAX_BUFFER) {
+        const allowedSlice = data.slice(0, MAX_BUFFER - outputLength);
+        outputChunks.push(allowedSlice);
+        outputChunks.push(Buffer.from('\n...[Output Truncated]'));
+        outputLength = MAX_BUFFER + 1;
+        
         runProcess.kill('SIGKILL');
-        output = output.substring(0, MAX_BUFFER) + '\n...[Output Truncated]';
+        clearTimeout(timeout);
         resolve({
           success: false,
-          output,
+          output: Buffer.concat(outputChunks).toString('utf8'),
           error: 'Output Limit Exceeded',
           executionTime: Date.now() - startTime
         });
+      } else {
+        outputChunks.push(data);
+        outputLength += data.length;
       }
     });
 
     runProcess.stderr.on('data', (data) => {
-      if (errorOutput.length > MAX_BUFFER) return;
-      errorOutput += data.toString();
-      if (errorOutput.length > MAX_BUFFER) {
+      if (errorLength > MAX_BUFFER) return;
+      
+      if (errorLength + data.length > MAX_BUFFER) {
+        const allowedSlice = data.slice(0, MAX_BUFFER - errorLength);
+        errorChunks.push(allowedSlice);
+        errorChunks.push(Buffer.from('\n...[Error Output Truncated]'));
+        errorLength = MAX_BUFFER + 1;
+        
         runProcess.kill('SIGKILL');
-        errorOutput = errorOutput.substring(0, MAX_BUFFER) + '\n...[Error Output Truncated]';
+        clearTimeout(timeout);
         resolve({
           success: false,
-          output,
+          output: Buffer.concat(outputChunks).toString('utf8'),
           error: 'Error Output Limit Exceeded',
           executionTime: Date.now() - startTime
         });
+      } else {
+        errorChunks.push(data);
+        errorLength += data.length;
       }
     });
 
@@ -152,6 +154,9 @@ const runDockerContainer = async (tempDir, dockerImage, runCommand, startTime) =
       clearTimeout(timeout);
 
       if (signal === 'SIGKILL') return;
+      
+      const output = Buffer.concat(outputChunks).toString('utf8');
+      const errorOutput = Buffer.concat(errorChunks).toString('utf8');
 
       if (code !== 0) {
         resolve({
@@ -172,42 +177,22 @@ const runDockerContainer = async (tempDir, dockerImage, runCommand, startTime) =
   });
 };
 
-const executeCpp = async (code, input, tempDir) => {
-  const sourceFile = path.join(tempDir, 'main.cpp');
-  const inputFile = path.join(tempDir, 'input.txt');
-  await fs.writeFile(sourceFile, code);
-  await fs.writeFile(inputFile, input || '');
-
-  const runCommand = 'g++ main.cpp -o main -O2 && ./main < input.txt';
-  return await runDockerContainer(tempDir, 'gcc:latest', runCommand, Date.now());
+const executeCpp = async (code, input, startTime) => {
+  const runCommand = `mkdir -p /tmp/run && cd /tmp/run && echo '${code.replace(/'/g, "'\\''")}' > main.cpp && g++ main.cpp -o main -O2 && ./main < <(echo '${(input||'').replace(/'/g, "'\\''")}')`;
+  return await runDockerContainer('gcc:latest', runCommand, startTime);
 };
 
-const executePython = async (code, input, tempDir) => {
-  const sourceFile = path.join(tempDir, 'main.py');
-  const inputFile = path.join(tempDir, 'input.txt');
-  await fs.writeFile(sourceFile, code);
-  await fs.writeFile(inputFile, input || '');
-
-  const runCommand = 'python main.py < input.txt';
-  return await runDockerContainer(tempDir, 'python:3.9-slim', runCommand, Date.now());
+const executePython = async (code, input, startTime) => {
+  const runCommand = `mkdir -p /tmp/run && cd /tmp/run && echo '${code.replace(/'/g, "'\\''")}' > main.py && python main.py < <(echo '${(input||'').replace(/'/g, "'\\''")}')`;
+  return await runDockerContainer('python:3.9-slim', runCommand, startTime);
 };
 
-const executeJavaScript = async (code, input, tempDir) => {
-  const sourceFile = path.join(tempDir, 'main.js');
-  const inputFile = path.join(tempDir, 'input.txt');
-  await fs.writeFile(sourceFile, code);
-  await fs.writeFile(inputFile, input || '');
-
-  const runCommand = 'node main.js < input.txt';
-  return await runDockerContainer(tempDir, 'node:18-alpine', runCommand, Date.now());
+const executeJavaScript = async (code, input, startTime) => {
+  const runCommand = `mkdir -p /tmp/run && cd /tmp/run && echo '${code.replace(/'/g, "'\\''")}' > main.js && node main.js < <(echo '${(input||'').replace(/'/g, "'\\''")}')`;
+  return await runDockerContainer('node:18-alpine', runCommand, startTime);
 };
 
-const executeJava = async (code, input, tempDir) => {
-  const sourceFile = path.join(tempDir, 'Main.java');
-  const inputFile = path.join(tempDir, 'input.txt');
-  await fs.writeFile(sourceFile, code);
-  await fs.writeFile(inputFile, input || '');
-
-  const runCommand = 'javac Main.java && java Main < input.txt';
-  return await runDockerContainer(tempDir, 'eclipse-temurin:17-jdk', runCommand, Date.now());
+const executeJava = async (code, input, startTime) => {
+  const runCommand = `mkdir -p /tmp/run && cd /tmp/run && echo '${code.replace(/'/g, "'\\''")}' > Main.java && javac Main.java && java Main < <(echo '${(input||'').replace(/'/g, "'\\''")}')`;
+  return await runDockerContainer('eclipse-temurin:17-jdk', runCommand, startTime);
 };

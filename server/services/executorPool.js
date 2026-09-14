@@ -16,6 +16,7 @@ app.use(express.json());
 // ============================================================================
 
 const POOL_SIZE = parseInt(process.env.POOL_SIZE || '3', 10);
+const MAX_POOL_SIZE = parseInt(process.env.MAX_POOL_SIZE || '10', 10);
 const EXECUTION_TIMEOUT = 5000;
 const MAX_BUFFER = 1024 * 1024;
 const TEMP_DIR = process.env.TEMP_DIR || '/tmp/codeforge';
@@ -113,10 +114,10 @@ const createExecutorContainer = async (language) => {
  * Returns a container to the pool for reuse
  */
 const returnContainerToPool = (language, containerId) => {
-  if (EXECUTORS[language] && EXECUTORS[language].containers.length < POOL_SIZE) {
+  if (EXECUTORS[language] && EXECUTORS[language].containers.length < MAX_POOL_SIZE) {
     EXECUTORS[language].containers.push(containerId);
   } else {
-    // Remove container if pool is full
+    // Remove container if max pool is full
     destroyContainer(containerId);
   }
 };
@@ -144,49 +145,65 @@ const executeInContainer = async (containerId, command, timeout = EXECUTION_TIME
     ];
 
     const proc = spawn('docker', dockerArgs);
-    let output = '';
-    let errorOutput = '';
+    const outputChunks = [];
+    const errorChunks = [];
+    let outputLength = 0;
+    let errorLength = 0;
 
     const timeoutHandle = setTimeout(() => {
       proc.kill('SIGKILL');
       resolve({
         success: false,
-        output,
+        output: Buffer.concat(outputChunks).toString('utf8'),
         error: 'Time Limit Exceeded (TLE)',
         executionTime: timeout
       });
     }, timeout);
 
     proc.stdout.on('data', (data) => {
-      if (output.length > MAX_BUFFER) return;
-      output += data.toString();
-
-      if (output.length > MAX_BUFFER) {
+      if (outputLength > MAX_BUFFER) return;
+      
+      if (outputLength + data.length > MAX_BUFFER) {
+        // Only take the slice that fits
+        const allowedSlice = data.slice(0, MAX_BUFFER - outputLength);
+        outputChunks.push(allowedSlice);
+        outputChunks.push(Buffer.from('\n...[Output Truncated]'));
+        outputLength = MAX_BUFFER + 1;
+        
         proc.kill('SIGKILL');
         clearTimeout(timeoutHandle);
-        output = output.substring(0, MAX_BUFFER) + '\n...[Output Truncated]';
         resolve({
           success: false,
-          output,
+          output: Buffer.concat(outputChunks).toString('utf8'),
           error: 'Output Limit Exceeded',
           executionTime: Date.now()
         });
+      } else {
+        outputChunks.push(data);
+        outputLength += data.length;
       }
     });
 
     proc.stderr.on('data', (data) => {
-      if (errorOutput.length > MAX_BUFFER) return;
-      errorOutput += data.toString();
-      if (errorOutput.length > MAX_BUFFER) {
+      if (errorLength > MAX_BUFFER) return;
+      
+      if (errorLength + data.length > MAX_BUFFER) {
+        const allowedSlice = data.slice(0, MAX_BUFFER - errorLength);
+        errorChunks.push(allowedSlice);
+        errorChunks.push(Buffer.from('\n...[Error Output Truncated]'));
+        errorLength = MAX_BUFFER + 1;
+        
         proc.kill('SIGKILL');
         clearTimeout(timeoutHandle);
-        errorOutput = errorOutput.substring(0, MAX_BUFFER) + '\n...[Error Output Truncated]';
         resolve({
           success: false,
-          output,
+          output: Buffer.concat(outputChunks).toString('utf8'),
           error: 'Error Output Limit Exceeded',
           executionTime: Date.now()
         });
+      } else {
+        errorChunks.push(data);
+        errorLength += data.length;
       }
     });
 
@@ -194,6 +211,9 @@ const executeInContainer = async (containerId, command, timeout = EXECUTION_TIME
       clearTimeout(timeoutHandle);
 
       if (signal === 'SIGKILL') return;
+
+      const output = Buffer.concat(outputChunks).toString('utf8');
+      const errorOutput = Buffer.concat(errorChunks).toString('utf8');
 
       if (code !== 0) {
         resolve({
