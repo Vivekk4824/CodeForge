@@ -1,10 +1,77 @@
-import React, { useRef, useState } from 'react';
-import Editor from '@monaco-editor/react';
-import { generateCode } from '../services/api';
+import React, { useRef, useState, useEffect } from 'react';
+import Editor, { useMonaco } from '@monaco-editor/react';
+import { generateCode, getInlineCompletion } from '../services/api';
 
-export default function MonacoEditor({ code, setCode, language }) {
+export default function MonacoEditor({ code, setCode, language, problemText, aiCopilotEnabled }) {
   const editorRef = useRef(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const monaco = useMonaco();
+  const latestProps = useRef({ language, problemText, aiCopilotEnabled });
+
+  useEffect(() => {
+    latestProps.current = { language, problemText, aiCopilotEnabled };
+  }, [language, problemText, aiCopilotEnabled]);
+
+  useEffect(() => {
+    if (!monaco) return;
+
+    let debounceTimer;
+    
+    const provider = monaco.languages.registerInlineCompletionsProvider('*', {
+      provideInlineCompletions: async (model, position, context, token) => {
+        const { aiCopilotEnabled, language, problemText } = latestProps.current;
+        if (!aiCopilotEnabled) return { items: [] };
+
+        // Only trigger completion automatically or explicitly, but avoid spamming on every keystroke too much.
+        const prefix = model.getValueInRange({
+          startLineNumber: 1,
+          startColumn: 1,
+          endLineNumber: position.lineNumber,
+          endColumn: position.column
+        });
+        const suffix = model.getValueInRange({
+          startLineNumber: position.lineNumber,
+          startColumn: position.column,
+          endLineNumber: model.getLineCount(),
+          endColumn: model.getLineMaxColumn(model.getLineCount())
+        });
+
+        if (!prefix.trim()) return { items: [] };
+
+        return new Promise((resolve) => {
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(async () => {
+            if (token.isCancellationRequested) {
+              resolve({ items: [] });
+              return;
+            }
+            try {
+              const res = await getInlineCompletion(language, problemText, prefix, suffix);
+              if (res.success && res.completion) {
+                resolve({
+                  items: [{
+                    insertText: res.completion,
+                    range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column)
+                  }]
+                });
+              } else {
+                resolve({ items: [] });
+              }
+            } catch (err) {
+              console.error('Autocomplete error:', err);
+              resolve({ items: [] });
+            }
+          }, 800);
+        });
+      },
+      freeInlineCompletions: () => {}
+    });
+
+    return () => {
+      provider.dispose();
+      if (debounceTimer) clearTimeout(debounceTimer);
+    };
+  }, [monaco]);
 
   const handleEditorChange = (value) => {
     setCode(value);
@@ -73,6 +140,7 @@ export default function MonacoEditor({ code, setCode, language }) {
         onChange={handleEditorChange}
         onMount={handleEditorDidMount}
         options={{
+        inlineSuggest: { enabled: true },
         minimap: { enabled: false },
         fontSize: 14,
         wordWrap: 'on',

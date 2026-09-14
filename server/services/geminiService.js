@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
-import { SYSTEM_PROMPT, getChatPrompt, getGeneratePrompt, getConvertPrompt } from '../utils/prompts.js';
+import { SYSTEM_PROMPT, getChatPrompt, getGeneratePrompt, getConvertPrompt, getAutocompletePrompt } from '../utils/prompts.js';
 
 let ai = null;
 
@@ -62,4 +62,18 @@ export const convertCode = async (fromLanguage, toLanguage, code) => {
   });
   
   return response.text.trim();
+};
+
+export const generateAutocomplete = async (language, problemText, prefix, suffix) => {
+  const genai = getAI();
+  if (!genai) throw new Error('Gemini API is not configured.');
+
+  const prompt = getAutocompletePrompt(language, problemText, prefix, suffix);
+  const response = await genai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: prompt,
+    config: { temperature: 0.1 }
+  });
+  
+  return response.text.replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '').trim();
 };

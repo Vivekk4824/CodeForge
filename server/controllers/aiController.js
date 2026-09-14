@@ -1,4 +1,4 @@
-import { chatWithAI, generateCode, convertCode } from '../services/geminiService.js';
+import { chatWithAI, generateCode, convertCode, generateAutocomplete } from '../services/geminiService.js';
 
 // @desc    Chat with AI
 // @route   POST /api/ai/chat
@@ -38,6 +38,19 @@ export const handleConvert = async (req, res) => {
   try {
     const convertedCode = await convertCode(fromLanguage, toLanguage, code);
     res.json({ success: true, code: convertedCode });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get inline autocomplete
+// @route   POST /api/ai/autocomplete
+export const handleAutocomplete = async (req, res) => {
+  const { language, problemText, prefix, suffix } = req.body;
+
+  try {
+    const completion = await generateAutocomplete(language, problemText, prefix, suffix);
+    res.json({ success: true, completion });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

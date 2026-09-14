@@ -1,9 +1,6 @@
 import React, { useState } from 'react';
 
-export default function ProblemPanel() {
-  const [problemText, setProblemText] = useState(
-    "Given an array of integers, find the maximum subarray sum.\n\nConstraints:\n1 <= n <= 10^5\n-10^9 <= arr[i] <= 10^9\n\nExample:\nInput: \n5\n1 2 3 4 5\nOutput: \n15"
-  );
+export default function ProblemPanel({ problemText, setProblemText }) {
 
   return (
     <div className="flex flex-col h-full">

@@ -59,3 +59,18 @@ export const convertCode = async (fromLanguage, toLanguage, code) => {
   }
   return response.json();
 };
+
+export const getInlineCompletion = async (language, problemText, prefix, suffix) => {
+  const response = await fetch(`${API_BASE_URL}/ai/autocomplete`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ language, problemText, prefix, suffix }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to get inline completion');
+  }
+  return response.json();
+};

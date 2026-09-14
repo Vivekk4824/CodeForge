@@ -37,6 +37,27 @@ Preserve the algorithm, logic, input/output behavior, and edge cases. Make it id
 
 Return only the raw code, without markdown blocks (\`\`\`) or explanations.
 
+
 Code:
 ${code}`;
+};
+
+export const getAutocompletePrompt = (language, problemText, prefix, suffix) => {
+  return `You are an AI code completion assistant, similar to GitHub Copilot.
+Your task is to provide the next logical chunk of code or a helpful inline comment hint at the cursor position.
+
+Problem Context:
+${problemText}
+
+Language: ${language}
+
+Code before cursor (prefix):
+${prefix}
+
+Code after cursor (suffix):
+${suffix}
+
+Provide ONLY the exact text that should be inserted at the cursor position. 
+Do not include markdown formatting (\`\`\`), no explanations, no prefix, and no suffix.
+If no completion is appropriate or necessary, return nothing.`;
 };
