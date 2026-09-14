@@ -18,8 +18,8 @@ export default function AIChat({ onClose, codeContext }) {
     setIsLoading(true);
 
     try {
-      // Pass the previous messages as history (excluding the first greeting if desired, or keep it)
-      const history = messages.filter(m => m.role !== 'system'); 
+      // Keep only the last 10 messages to avoid unbounded history growth
+      const history = messages.filter(m => m.role !== 'system').slice(-10); 
       const response = await chatWithAI({ code: codeContext }, history, userMessage);
       
       setMessages(prev => [...prev, { role: 'ai', text: response.text }]);

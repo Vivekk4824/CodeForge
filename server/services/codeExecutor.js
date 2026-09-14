@@ -119,9 +119,11 @@ const runDockerContainer = async (tempDir, dockerImage, runCommand, startTime) =
     }, EXECUTION_TIMEOUT);
 
     runProcess.stdout.on('data', (data) => {
+      if (output.length > MAX_BUFFER) return;
       output += data.toString();
       if (output.length > MAX_BUFFER) {
         runProcess.kill('SIGKILL');
+        output = output.substring(0, MAX_BUFFER) + '\n...[Output Truncated]';
         resolve({
           success: false,
           output,
@@ -132,7 +134,18 @@ const runDockerContainer = async (tempDir, dockerImage, runCommand, startTime) =
     });
 
     runProcess.stderr.on('data', (data) => {
+      if (errorOutput.length > MAX_BUFFER) return;
       errorOutput += data.toString();
+      if (errorOutput.length > MAX_BUFFER) {
+        runProcess.kill('SIGKILL');
+        errorOutput = errorOutput.substring(0, MAX_BUFFER) + '\n...[Error Output Truncated]';
+        resolve({
+          success: false,
+          output,
+          error: 'Error Output Limit Exceeded',
+          executionTime: Date.now() - startTime
+        });
+      }
     });
 
     runProcess.on('close', (code, signal) => {

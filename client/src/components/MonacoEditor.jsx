@@ -5,8 +5,17 @@ import { generateCode, getInlineCompletion } from '../services/api';
 export default function MonacoEditor({ code, setCode, language, problemText, aiCopilotEnabled }) {
   const editorRef = useRef(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [localCode, setLocalCode] = useState(code);
+  const updateTimerRef = useRef(null);
   const monaco = useMonaco();
   const latestProps = useRef({ language, problemText, aiCopilotEnabled });
+
+  // Sync localCode if parent's code changes (e.g. language template switch)
+  useEffect(() => {
+    if (code !== localCode) {
+      setLocalCode(code);
+    }
+  }, [code]);
 
   useEffect(() => {
     latestProps.current = { language, problemText, aiCopilotEnabled };
@@ -74,7 +83,11 @@ export default function MonacoEditor({ code, setCode, language, problemText, aiC
   }, [monaco]);
 
   const handleEditorChange = (value) => {
-    setCode(value);
+    setLocalCode(value);
+    if (updateTimerRef.current) clearTimeout(updateTimerRef.current);
+    updateTimerRef.current = setTimeout(() => {
+      setCode(value);
+    }, 400); // Debounce parent sync to avoid heavy Playground re-renders
   };
 
   const handleEditorDidMount = (editor, monaco) => {
@@ -136,7 +149,7 @@ export default function MonacoEditor({ code, setCode, language, problemText, aiC
         height="100%"
         language={language === 'cpp' ? 'cpp' : language}
         theme="vs-dark"
-        value={code}
+        value={localCode}
         onChange={handleEditorChange}
         onMount={handleEditorDidMount}
         options={{

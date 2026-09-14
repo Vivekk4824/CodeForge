@@ -1,8 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import LoginModal from './LoginModal';
 
 export default function Header() {
+  const { user, logout } = useAuth();
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+
   return (
+    <>
     <header className="h-16 border-b border-[#30363d] bg-[#161b22] flex items-center justify-between px-4">
       <div className="flex items-center gap-6">
         <Link to="/" className="flex items-center gap-3 group">
@@ -23,10 +29,32 @@ export default function Header() {
       </div>
       <div className="flex items-center gap-4 text-sm">
         <button className="text-[#c9d1d9] hover:text-white transition-colors">History</button>
-        <button className="px-3 py-1.5 bg-[#238636] text-white rounded-md font-medium hover:bg-[#2ea043] transition-colors">
-          Sign In
-        </button>
+        {user ? (
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-xs uppercase">
+                {user.name.charAt(0)}
+              </div>
+              <span className="text-[#c9d1d9] font-medium hidden sm:block">{user.name}</span>
+            </div>
+            <button 
+              onClick={logout}
+              className="text-[#8b949e] hover:text-[#f85149] transition-colors text-xs uppercase font-bold tracking-wider"
+            >
+              Logout
+            </button>
+          </div>
+        ) : (
+          <button 
+            onClick={() => setIsLoginModalOpen(true)}
+            className="px-3 py-1.5 bg-[#238636] text-white rounded-md font-medium hover:bg-[#2ea043] transition-colors"
+          >
+            Sign In
+          </button>
+        )}
       </div>
     </header>
+    <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
+    </>
   );
 }

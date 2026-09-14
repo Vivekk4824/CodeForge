@@ -1,13 +1,13 @@
 import rateLimit from 'express-rate-limit';
 
-const ANONYMOUS_EXECUTIONS_PER_HOUR = 3000; // Increased for local testing
+const ANONYMOUS_EXECUTIONS_PER_DAY = 3;
 
 export const anonymousExecutionLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: ANONYMOUS_EXECUTIONS_PER_HOUR,
+  windowMs: 24 * 60 * 60 * 1000, // 24 hours
+  max: ANONYMOUS_EXECUTIONS_PER_DAY,
   message: {
     success: false,
-    message: "You've reached the free execution limit. Sign in to continue with unlimited code executions."
+    message: "You've reached the free limit of 3 executions per day. Sign in to continue with unlimited code executions."
   },
   standardHeaders: true,
   legacyHeaders: false,

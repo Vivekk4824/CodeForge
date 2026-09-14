@@ -13,7 +13,20 @@ const userSchema = new mongoose.Schema({
   },
   passwordHash: {
     type: String,
-    required: true,
+    required: false, // Optional for OAuth users
+  },
+  googleId: {
+    type: String,
+    sparse: true,
+  },
+  githubId: {
+    type: String,
+    sparse: true,
+  },
+  authProvider: {
+    type: String,
+    enum: ['local', 'google', 'github'],
+    default: 'local'
   },
   subscriptionType: {
     type: String,
@@ -40,6 +53,7 @@ userSchema.pre('save', async function(next) {
 
 // Match user entered password to hashed password in database
 userSchema.methods.matchPassword = async function(enteredPassword) {
+  if (!this.passwordHash) return false;
   return await bcrypt.compare(enteredPassword, this.passwordHash);
 };
 

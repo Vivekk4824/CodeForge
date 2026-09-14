@@ -158,12 +158,13 @@ const executeInContainer = async (containerId, command, timeout = EXECUTION_TIME
     }, timeout);
 
     proc.stdout.on('data', (data) => {
-      const chunk = data.toString();
-      output += chunk;
+      if (output.length > MAX_BUFFER) return;
+      output += data.toString();
 
       if (output.length > MAX_BUFFER) {
         proc.kill('SIGKILL');
         clearTimeout(timeoutHandle);
+        output = output.substring(0, MAX_BUFFER) + '\n...[Output Truncated]';
         resolve({
           success: false,
           output,
@@ -174,7 +175,19 @@ const executeInContainer = async (containerId, command, timeout = EXECUTION_TIME
     });
 
     proc.stderr.on('data', (data) => {
+      if (errorOutput.length > MAX_BUFFER) return;
       errorOutput += data.toString();
+      if (errorOutput.length > MAX_BUFFER) {
+        proc.kill('SIGKILL');
+        clearTimeout(timeoutHandle);
+        errorOutput = errorOutput.substring(0, MAX_BUFFER) + '\n...[Error Output Truncated]';
+        resolve({
+          success: false,
+          output,
+          error: 'Error Output Limit Exceeded',
+          executionTime: Date.now()
+        });
+      }
     });
 
     proc.on('close', (code, signal) => {
