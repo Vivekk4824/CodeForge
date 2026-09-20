@@ -35,6 +35,10 @@ app.get('/', (req, res) => {
   res.send('AI Coding Platform API is running');
 });
 
+app.get('/api/health', (req, res) => {
+  res.json({ success: true, message: 'CodeForge API is healthy', uptime: process.uptime() });
+});
+
 // Basic Error Handler
 app.use((err, req, res, next) => {
   const statusCode = res.statusCode === 200 ? 500 : res.statusCode;

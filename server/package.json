@@ -5,7 +5,12 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "k6:code": "k6 run k6/code-run.js",
+    "k6:chat": "k6 run k6/ai-chat.js",
+    "k6:generate": "k6 run k6/ai-generate.js",
+    "k6:auth": "k6 run k6/auth.js",
+    "k6:full": "k6 run k6/full-api-test.js"
   },
   "keywords": [],
   "author": "",
