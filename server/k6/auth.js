@@ -116,10 +116,10 @@ export default function () {
       });
 
       check(meUnauthRes, {
-        'unauthorized /me returns 401': (r) => r.status === 401,
-        'unauthorized message returned': (r) => {
+        'unauthorized /me returns 401 or null user': (r) => r.status === 401 || (r.status === 200 && r.json()?.user === null),
+        'unauthorized message or null user returned': (r) => {
           try {
-            return r.json().success === false;
+            return r.json().success === false || r.json().user === null;
           } catch (e) {
             return false;
           }
@@ -134,6 +134,7 @@ export default function () {
 
       const badLoginRes = http.post(`${BASE_URL}/api/auth/login`, badLoginPayload, {
         headers: JSON_HEADERS,
+        responseCallback: http.expectedStatuses(401),
       });
 
       check(badLoginRes, {

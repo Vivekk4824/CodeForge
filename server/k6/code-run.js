@@ -89,7 +89,12 @@ export default function (data) {
 
   // Verify response
   const isOk = check(res, {
-    'status is 200': (r) => r.status === 200,
+    'code run status is 200': (r) => {
+      if (r.status !== 200) {
+        console.log(`Code Run Error [${r.status}]: ${r.body}`);
+      }
+      return r.status === 200;
+    },
     'response has valid JSON': (r) => {
       try {
         r.json();

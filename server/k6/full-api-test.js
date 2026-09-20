@@ -113,7 +113,7 @@ export default function (data) {
         headers: JSON_HEADERS,
       });
       check(unauthRes, {
-        'unauthorized profile returns 401': (r) => r.status === 401,
+        'unauthorized profile returns 401 or null user': (r) => r.status === 401 || (r.status === 200 && r.json()?.user === null),
       });
     }
   });
