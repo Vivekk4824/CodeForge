@@ -19,6 +19,8 @@ export default function Playground() {
   const [language, setLanguage] = useState('cpp');
   const [input, setInput] = useState('');
   const [output, setOutput] = useState('');
+  const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState('input');
   const [showChat, setShowChat] = useState(false);
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
@@ -60,15 +62,22 @@ export default function Playground() {
   const handleRunCode = async () => {
     setIsRunning(true);
     setOutput('Running...\n');
+    setError('');
+    setActiveTab('output');
     try {
       const response = await runCode(language, code, input);
       if (response.success) {
         setOutput(response.output || '');
+        setError('');
+        setActiveTab('output');
       } else {
-        setOutput(response.error || 'Execution failed.');
+        setOutput(response.output || '');
+        setError(response.error || 'Execution failed.');
+        setActiveTab('errors');
       }
     } catch (err) {
-      setOutput(`Error: ${err.message}`);
+      setError(`Error: ${err.message}`);
+      setActiveTab('errors');
     } finally {
       setIsRunning(false);
     }
@@ -145,7 +154,14 @@ export default function Playground() {
 
         {/* Input/Output Panel */}
         <div className="h-1/3 min-h-[200px] border-t border-[#30363d]">
-          <InputOutputPanel input={input} setInput={setInput} output={output} />
+          <InputOutputPanel 
+            input={input} 
+            setInput={setInput} 
+            output={output} 
+            error={error}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+          />
         </div>
       </div>
 

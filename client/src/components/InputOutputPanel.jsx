@@ -1,7 +1,9 @@
 import React, { useState, memo } from 'react';
 
-const InputOutputPanel = memo(function InputOutputPanel({ input, setInput, output }) {
-  const [activeTab, setActiveTab] = useState('input');
+const InputOutputPanel = memo(function InputOutputPanel({ input, setInput, output, error, activeTab: propActiveTab, setActiveTab: propSetActiveTab }) {
+  const [internalActiveTab, setInternalActiveTab] = useState('input');
+  const activeTab = propActiveTab !== undefined ? propActiveTab : internalActiveTab;
+  const setActiveTab = propSetActiveTab !== undefined ? propSetActiveTab : setInternalActiveTab;
 
   return (
     <div className="flex flex-col h-full bg-[#0d1117]">
@@ -24,11 +26,14 @@ const InputOutputPanel = memo(function InputOutputPanel({ input, setInput, outpu
         </button>
         <button
           onClick={() => setActiveTab('errors')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'errors' ? 'border-[#f85149] text-[#c9d1d9]' : 'border-transparent text-[#8b949e] hover:text-[#c9d1d9]'
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'errors' ? 'border-[#f85149] text-[#f85149]' : 'border-transparent text-[#8b949e] hover:text-[#c9d1d9]'
           }`}
         >
-          Errors
+          <span>Errors</span>
+          {error && (
+            <span className="w-2 h-2 rounded-full bg-[#f85149] animate-pulse"></span>
+          )}
         </button>
       </div>
       <div className="flex-1 p-4 overflow-y-auto">
@@ -47,8 +52,8 @@ const InputOutputPanel = memo(function InputOutputPanel({ input, setInput, outpu
           </pre>
         )}
         {activeTab === 'errors' && (
-          <pre className="text-[#f85149] font-mono text-sm whitespace-pre-wrap">
-            No errors.
+          <pre className={`font-mono text-sm whitespace-pre-wrap ${error ? 'text-[#f85149]' : 'text-[#8b949e]'}`}>
+            {error || 'No errors.'}
           </pre>
         )}
       </div>

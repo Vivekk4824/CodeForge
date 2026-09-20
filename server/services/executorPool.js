@@ -17,7 +17,7 @@ app.use(express.json());
 
 const POOL_SIZE = parseInt(process.env.POOL_SIZE || '3', 10);
 const MAX_POOL_SIZE = parseInt(process.env.MAX_POOL_SIZE || '10', 10);
-const EXECUTION_TIMEOUT = 5000;
+const EXECUTION_TIMEOUT = parseInt(process.env.EXECUTION_TIMEOUT || '15000', 10);
 const MAX_BUFFER = 1024 * 1024;
 const TEMP_DIR = process.env.TEMP_DIR || '/tmp/codeforge';
 
@@ -290,22 +290,25 @@ app.post('/execute', async (req, res) => {
     let command;
     const srcDir = '/usr/src/app';
 
+    const b64Code = Buffer.from(code).toString('base64');
+    const b64Input = Buffer.from(input || '').toString('base64');
+
     switch (language.toLowerCase()) {
       case 'cpp':
-        command = `echo '${code.replace(/'/g, "'\\''")}' > main.cpp && g++ -O2 main.cpp -o main && ./main < <(echo '${input.replace(/'/g, "'\\''")}')`;
+        command = `echo '${b64Code}' | base64 -d > main.cpp && echo '${b64Input}' | base64 -d > input.txt && g++ -O2 main.cpp -o main && ./main < input.txt`;
         break;
 
       case 'python':
-        command = `echo '${code.replace(/'/g, "'\\''")}' > main.py && python main.py < <(echo '${input.replace(/'/g, "'\\''")}')`;
+        command = `echo '${b64Code}' | base64 -d > main.py && echo '${b64Input}' | base64 -d > input.txt && python main.py < input.txt`;
         break;
 
       case 'javascript':
-        command = `echo '${code.replace(/'/g, "'\\''")}' > main.js && node main.js < <(echo '${input.replace(/'/g, "'\\''")}')`;
+        command = `echo '${b64Code}' | base64 -d > main.js && echo '${b64Input}' | base64 -d > input.txt && node main.js < input.txt`;
         break;
 
       case 'java':
         const javaClass = filename ? filename.replace('.java', '') : 'Main';
-        command = `echo '${code.replace(/'/g, "'\\''")}' > ${javaClass}.java && javac ${javaClass}.java && java ${javaClass} < <(echo '${input.replace(/'/g, "'\\''")}')`;
+        command = `echo '${b64Code}' | base64 -d > ${javaClass}.java && echo '${b64Input}' | base64 -d > input.txt && javac ${javaClass}.java && java ${javaClass} < input.txt`;
         break;
 
       default:

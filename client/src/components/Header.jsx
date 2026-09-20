@@ -33,9 +33,9 @@ export default function Header() {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-xs uppercase">
-                {user.name.charAt(0)}
+                {(user.name || user.email || 'U').charAt(0)}
               </div>
-              <span className="text-[#c9d1d9] font-medium hidden sm:block">{user.name}</span>
+              <span className="text-[#c9d1d9] font-medium hidden sm:block">{user.name || user.email}</span>
             </div>
             <button 
               onClick={logout}

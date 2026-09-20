@@ -9,7 +9,13 @@ const router = express.Router();
 
 router.post('/register', registerUser);
 router.post('/login', loginUser);
-router.get('/me', protect, getUserProfile);
+router.get('/me', (req, res, next) => {
+  const token = req.cookies?.jwt || (req.headers.authorization?.startsWith('Bearer') ? req.headers.authorization.split(' ')[1] : null);
+  if (!token) {
+    return res.json({ success: true, user: null });
+  }
+  protect(req, res, next);
+}, getUserProfile);
 
 // Google OAuth
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'], session: false }));

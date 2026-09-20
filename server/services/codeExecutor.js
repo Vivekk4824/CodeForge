@@ -5,8 +5,8 @@ import { v4 as uuidv4 } from 'uuid';
 import os from 'os';
 import axios from 'axios';
 
-// Configurable limits
-const EXECUTION_TIMEOUT = 5000; // 5 seconds
+// Configurable limits (15s allows Docker container spin-up + compilation on local Windows)
+const EXECUTION_TIMEOUT = parseInt(process.env.EXECUTION_TIMEOUT, 10) || 15000;
 const MAX_BUFFER = 1024 * 1024; // 1MB
 
 // Executor pool service configuration
@@ -104,10 +104,11 @@ const runDockerContainer = async (dockerImage, runCommand, startTime, language) 
 
     const timeout = setTimeout(() => {
       runProcess.kill('SIGKILL');
+      const errOut = Buffer.concat(errorChunks).toString('utf8');
       resolve({
         success: false,
         output: Buffer.concat(outputChunks).toString('utf8'),
-        error: 'Time Limit Exceeded (TLE)',
+        error: errOut ? `Time Limit Exceeded (TLE)\n${errOut}` : 'Time Limit Exceeded (TLE)',
         executionTime: Date.now() - startTime
       });
     }, EXECUTION_TIMEOUT);
@@ -186,21 +187,29 @@ const runDockerContainer = async (dockerImage, runCommand, startTime, language) 
 };
 
 const executeCpp = async (code, input, startTime) => {
-  const runCommand = `mkdir -p /tmp/run && cd /tmp/run && echo '${code.replace(/'/g, "'\\''")}' > main.cpp && g++ main.cpp -o main -O2 && ./main < <(echo '${(input||'').replace(/'/g, "'\\''")}')`;
+  const b64Code = Buffer.from(code).toString('base64');
+  const b64Input = Buffer.from(input || '').toString('base64');
+  const runCommand = `mkdir -p /tmp/run && cd /tmp/run && echo '${b64Code}' | base64 -d > main.cpp && echo '${b64Input}' | base64 -d > input.txt && g++ main.cpp -o main -O2 && ./main < input.txt`;
   return await runDockerContainer('gcc:latest', runCommand, startTime, 'cpp');
 };
 
 const executePython = async (code, input, startTime) => {
-  const runCommand = `mkdir -p /tmp/run && cd /tmp/run && echo '${code.replace(/'/g, "'\\''")}' > main.py && python main.py < <(echo '${(input||'').replace(/'/g, "'\\''")}')`;
+  const b64Code = Buffer.from(code).toString('base64');
+  const b64Input = Buffer.from(input || '').toString('base64');
+  const runCommand = `mkdir -p /tmp/run && cd /tmp/run && echo '${b64Code}' | base64 -d > main.py && echo '${b64Input}' | base64 -d > input.txt && python main.py < input.txt`;
   return await runDockerContainer('python:3.9-slim', runCommand, startTime, 'python');
 };
 
 const executeJavaScript = async (code, input, startTime) => {
-  const runCommand = `mkdir -p /tmp/run && cd /tmp/run && echo '${code.replace(/'/g, "'\\''")}' > main.js && node main.js < <(echo '${(input||'').replace(/'/g, "'\\''")}')`;
+  const b64Code = Buffer.from(code).toString('base64');
+  const b64Input = Buffer.from(input || '').toString('base64');
+  const runCommand = `mkdir -p /tmp/run && cd /tmp/run && echo '${b64Code}' | base64 -d > main.js && echo '${b64Input}' | base64 -d > input.txt && node main.js < input.txt`;
   return await runDockerContainer('node:18-alpine', runCommand, startTime, 'javascript');
 };
 
 const executeJava = async (code, input, startTime) => {
-  const runCommand = `mkdir -p /tmp/run && cd /tmp/run && echo '${code.replace(/'/g, "'\\''")}' > Main.java && javac Main.java && java Main < <(echo '${(input||'').replace(/'/g, "'\\''")}')`;
+  const b64Code = Buffer.from(code).toString('base64');
+  const b64Input = Buffer.from(input || '').toString('base64');
+  const runCommand = `mkdir -p /tmp/run && cd /tmp/run && echo '${b64Code}' | base64 -d > Main.java && echo '${b64Input}' | base64 -d > input.txt && javac Main.java && java Main < input.txt`;
   return await runDockerContainer('eclipse-temurin:17-jdk', runCommand, startTime, 'java');
 };

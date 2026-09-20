@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 240" width="100%" height="100%">
+  <defs>
+    <linearGradient id="brandFire" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FF3D00"/>
+      <stop offset="60%" stop-color="#FF9100"/>
+      <stop offset="100%" stop-color="#FFEA00"/>
+    </linearGradient>
+
+    <linearGradient id="brandCyan" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00E5FF"/>
+      <stop offset="100%" stop-color="#2979FF"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="900" height="240" rx="32" fill="#090D16"/>
+
+  <!-- Icon Section -->
+  <g transform="translate(40, 20)">
+    <!-- Left Bracket -->
+    <path d="M60 60 L20 100 L60 140" fill="none" stroke="url(#brandCyan)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Right Bracket -->
+    <path d="M140 60 L180 100 L140 140" fill="none" stroke="url(#brandCyan)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Central Forge Slash -->
+    <path d="M115 45 L85 155" stroke="url(#brandFire)" stroke-width="16" stroke-linecap="round"/>
+    <!-- Floating Spark -->
+    <polygon points="125,70 132,85 147,85 135,95 139,110 125,100 111,110 115,95 103,85 118,85" fill="#FFEA00" transform="scale(0.5) translate(120, 30)"/>
+  </g>
+
+  <!-- Typography -->
+  <g font-family="system-ui, -apple-system, 'Segoe UI', Roboto, monospace">
+    <!-- "Code" Text -->
+    <text x="270" y="125" font-size="72" font-weight="800" fill="#F8FAFC" letter-spacing="-1">Code</text>
+    <!-- "Forge" Text (Gradient) -->
+    <text x="445" y="125" font-size="72" font-weight="900" fill="url(#brandFire)" letter-spacing="-1">Forge</text>
+    
+    <!-- Subtitle / Tagline -->
+    <text x="275" y="165" font-size="18" font-weight="600" fill="#64748B" letter-spacing="4">COMPETITIVE PROGRAMMING IDE</text>
+  </g>
+
+  <!-- Terminal Dot Accents -->
+  <circle cx="830" cy="50" r="6" fill="#EF4444" opacity="0.8"/>
+  <circle cx="850" cy="50" r="6" fill="#F59E0B" opacity="0.8"/>
+  <circle cx="870" cy="50" r="6" fill="#10B981" opacity="0.8"/>
+</svg>

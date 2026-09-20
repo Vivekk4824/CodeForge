@@ -1,4 +1,8 @@
 import mongoose from 'mongoose';
+import dns from 'dns';
+
+// Fix for Node c-ares DNS resolver failing SRV queries on local ISP/router DNS
+dns.setServers(['8.8.8.8', '8.8.4.4']);
 
 export const connectDB = async () => {
   try {
