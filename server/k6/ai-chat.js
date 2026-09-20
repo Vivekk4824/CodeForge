@@ -40,7 +40,12 @@ export default function () {
   });
 
   check(res, {
-    'status is 200': (r) => r.status === 200,
+    'ai chat returns 200': (r) => {
+      if (r.status !== 200) {
+        console.log(`AI Chat Error [${r.status}]: ${r.body}`);
+      }
+      return r.status === 200;
+    },
     'response has valid JSON': (r) => {
       try {
         r.json();

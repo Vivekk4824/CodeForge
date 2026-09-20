@@ -61,7 +61,11 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
     )
   );
 }
-
+console.log('GitHub Client ID:', process.env.GITHUB_CLIENT_ID);
+console.log(
+  'GitHub Secret exists:',
+  !!process.env.GITHUB_CLIENT_SECRET
+);
 if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
   passport.use(
     new GitHubStrategy(

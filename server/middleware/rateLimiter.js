@@ -12,7 +12,8 @@ export const anonymousExecutionLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => {
-    // If the user is authenticated (we have a valid token), skip rate limiting
+    // If rate limiting is disabled for testing or user is authenticated, skip rate limiting
+    if (process.env.DISABLE_RATE_LIMIT === 'true') return true;
     return req.user != null;
   }
 });

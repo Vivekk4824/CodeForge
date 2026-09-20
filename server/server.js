@@ -1,5 +1,5 @@
+import 'dotenv/config';
 import express from 'express';
-import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
@@ -10,7 +10,7 @@ import authRoutes from './routes/authRoutes.js';
 import codeRoutes from './routes/codeRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
 
-dotenv.config();
+
 connectDB();
 
 const app = express();

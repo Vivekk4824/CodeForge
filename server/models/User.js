@@ -45,10 +45,15 @@ const userSchema = new mongoose.Schema({
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {
-  if (!this.isModified('passwordHash')) return next();
+  // Don't hash password for OAuth users
+  if (!this.isModified('passwordHash') || !this.passwordHash) {
+    return;
+  }
+
   const salt = await bcrypt.genSalt(10);
   this.passwordHash = await bcrypt.hash(this.passwordHash, salt);
-  next();
+
+
 });
 
 // Match user entered password to hashed password in database

@@ -41,17 +41,15 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    // In a full implementation, you might want to call a /logout endpoint to clear the HTTP-only cookie on the server.
-    // For now, since the cookie is HTTP-only, we just clear the local state.
-    // Actually, to properly clear HTTP-only cookie we must hit an endpoint.
     try {
-        // Optional: wait for backend logout endpoint if it existed
-        // await fetch('http://localhost:5000/api/auth/logout', { method: 'POST', credentials: 'include' });
-        setUser(null);
-        // Force reload to clear any cached states and cookies (if max-age was set to 0 by backend)
-        window.location.href = '/'; 
-    } catch(err) {
-        console.error(err);
+      await fetch('http://localhost:5000/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
+    } catch (err) {
+      console.error('Failed to logout on server:', err);
+    } finally {
+      setUser(null);
     }
   };
 

@@ -86,3 +86,16 @@ export const getUserProfile = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// @desc    Logout user & clear HTTP-only cookie
+// @route   POST /api/auth/logout
+export const logoutUser = (req, res) => {
+  res.cookie('jwt', '', {
+    httpOnly: true,
+    expires: new Date(0),
+    secure: process.env.NODE_ENV !== 'development',
+    sameSite: 'strict',
+    path: '/'
+  });
+  res.status(200).json({ success: true, message: 'Logged out successfully' });
+};
