@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+  <defs>
+    <!-- Cyan to Blue gradient for the angle brackets -->
+    <linearGradient id="bracketGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#00E5FF"/>
+      <stop offset="100%" stop-color="#1A73E8"/>
+    </linearGradient>
+    
+    <!-- Orange to Yellow gradient for the forward slash -->
+    <linearGradient id="slashGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FF4500"/>
+      <stop offset="100%" stop-color="#FFD700"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Left Angle Bracket "<" -->
+  <path d="M 35 25 L 15 50 L 35 75" 
+        fill="none" 
+        stroke="url(#bracketGrad)" 
+        stroke-width="12" 
+        stroke-linecap="round" 
+        stroke-linejoin="round" />
+
+  <!-- Right Angle Bracket ">" -->
+  <path d="M 65 25 L 85 50 L 65 75" 
+        fill="none" 
+        stroke="url(#bracketGrad)" 
+        stroke-width="12" 
+        stroke-linecap="round" 
+        stroke-linejoin="round" />
+
+  <!-- Forward Slash "/" -->
+  <path d="M 40 85 L 60 15" 
+        fill="none" 
+        stroke="url(#slashGrad)" 
+        stroke-width="12" 
+        stroke-linecap="round" />
+
+  <!-- Accent Star on the top right of the slash -->
+  <g transform="translate(64, 22) scale(0.65)">
+    <path d="M 0 -10 L 2.24 -3.09 L 9.51 -3.09 L 3.63 1.18 L 5.88 8.09 L 0 3.82 L -5.88 8.09 L -3.63 1.18 L -9.51 -3.09 L -2.24 -3.09 Z" 
+          fill="#FFD700" />
+  </g>
+</svg>
