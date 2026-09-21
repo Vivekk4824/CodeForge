@@ -109,55 +109,43 @@ export const executeWithPiston = async (language, code, input) => {
 };
 
 /**
- * Direct execution (Docker sandbox with Piston fallback)
+ * Direct execution (uses Docker sandbox if available, otherwise executes natively via container compilers)
  */
 export const executeCodeDirect = async (language, code, input) => {
   const startTime = Date.now();
-  const hasDocker = await checkDocker();
-
-  // If Docker is not available on host/container, fall back to Piston
-  if (!hasDocker) {
-    console.log('Docker daemon unavailable. Routing execution to Piston fallback...');
-    return await executeWithPiston(language, code, input);
-  }
-
   try {
-    let result;
     switch (language) {
       case 'cpp':
-        result = await executeCpp(code, input, startTime);
-        break;
+        return await executeCpp(code, input, startTime);
       case 'python':
-        result = await executePython(code, input, startTime);
-        break;
+        return await executePython(code, input, startTime);
       case 'javascript':
-        result = await executeJavaScript(code, input, startTime);
-        break;
+        return await executeJavaScript(code, input, startTime);
       case 'java':
-        result = await executeJava(code, input, startTime);
-        break;
+        return await executeJava(code, input, startTime);
       default:
         throw new Error(`Language ${language} is not supported yet.`);
     }
-
-    // If Docker execution failed due to system/daemon error, try Piston fallback
-    if (result && result.error && (result.error.includes('docker') || result.error.includes('daemon') || result.error.includes('ECONNREFUSED'))) {
-      console.log('Docker daemon error encountered. Trying Piston fallback...');
+  } catch (error) {
+    console.error('Direct execution error:', error.message);
+    // If native/docker both fail, check if user provided a private authenticated Piston URL
+    if (process.env.PISTON_API_KEY || (process.env.PISTON_URL && !process.env.PISTON_URL.includes('emkc.org'))) {
       return await executeWithPiston(language, code, input);
     }
-
-    return result;
-  } catch (error) {
-    console.warn('Direct Docker execution failed, falling back to Piston:', error.message);
-    return await executeWithPiston(language, code, input);
+    return {
+      success: false,
+      output: null,
+      error: error.message,
+      executionTime: Date.now() - startTime
+    };
   }
 };
 
 /**
- * Main execution function - routes to pool, direct Docker, or Piston
+ * Main execution function - routes to pool, direct container execution, or private Piston
  */
 export const executeCode = async (language, code, input) => {
-  if (process.env.USE_PISTON === 'true') {
+  if (process.env.USE_PISTON === 'true' && (process.env.PISTON_API_KEY || (process.env.PISTON_URL && !process.env.PISTON_URL.includes('emkc.org')))) {
     return await executeWithPiston(language, code, input);
   }
 
@@ -305,29 +293,37 @@ const runDockerContainer = async (dockerImage, runCommand, startTime, language) 
 };
 
 const executeCpp = async (code, input, startTime) => {
+  const runId = uuidv4().replace(/-/g, '');
+  const runDir = `/tmp/run_${runId}`;
   const b64Code = Buffer.from(code).toString('base64');
   const b64Input = Buffer.from(input || '').toString('base64');
-  const runCommand = `mkdir -p /tmp/run && cd /tmp/run && echo '${b64Code}' | base64 -d > main.cpp && echo '${b64Input}' | base64 -d > input.txt && g++ main.cpp -o main -O2 && ./main < input.txt`;
+  const runCommand = `mkdir -p ${runDir} && cd ${runDir} && echo '${b64Code}' | base64 -d > main.cpp && echo '${b64Input}' | base64 -d > input.txt && g++ main.cpp -o main -O2 && ./main < input.txt; status=$?; rm -rf ${runDir}; exit $status`;
   return await runDockerContainer('gcc:latest', runCommand, startTime, 'cpp');
 };
 
 const executePython = async (code, input, startTime) => {
+  const runId = uuidv4().replace(/-/g, '');
+  const runDir = `/tmp/run_${runId}`;
   const b64Code = Buffer.from(code).toString('base64');
   const b64Input = Buffer.from(input || '').toString('base64');
-  const runCommand = `mkdir -p /tmp/run && cd /tmp/run && echo '${b64Code}' | base64 -d > main.py && echo '${b64Input}' | base64 -d > input.txt && (command -v python3 >/dev/null && python3 main.py < input.txt || python main.py < input.txt)`;
+  const runCommand = `mkdir -p ${runDir} && cd ${runDir} && echo '${b64Code}' | base64 -d > main.py && echo '${b64Input}' | base64 -d > input.txt && (command -v python3 >/dev/null && python3 main.py < input.txt || python main.py < input.txt); status=$?; rm -rf ${runDir}; exit $status`;
   return await runDockerContainer('python:3.9-slim', runCommand, startTime, 'python');
 };
 
 const executeJavaScript = async (code, input, startTime) => {
+  const runId = uuidv4().replace(/-/g, '');
+  const runDir = `/tmp/run_${runId}`;
   const b64Code = Buffer.from(code).toString('base64');
   const b64Input = Buffer.from(input || '').toString('base64');
-  const runCommand = `mkdir -p /tmp/run && cd /tmp/run && echo '${b64Code}' | base64 -d > main.js && echo '${b64Input}' | base64 -d > input.txt && node main.js < input.txt`;
+  const runCommand = `mkdir -p ${runDir} && cd ${runDir} && echo '${b64Code}' | base64 -d > main.js && echo '${b64Input}' | base64 -d > input.txt && node main.js < input.txt; status=$?; rm -rf ${runDir}; exit $status`;
   return await runDockerContainer('node:18-alpine', runCommand, startTime, 'javascript');
 };
 
 const executeJava = async (code, input, startTime) => {
+  const runId = uuidv4().replace(/-/g, '');
+  const runDir = `/tmp/run_${runId}`;
   const b64Code = Buffer.from(code).toString('base64');
   const b64Input = Buffer.from(input || '').toString('base64');
-  const runCommand = `mkdir -p /tmp/run && cd /tmp/run && echo '${b64Code}' | base64 -d > Main.java && echo '${b64Input}' | base64 -d > input.txt && javac Main.java && java Main < input.txt`;
+  const runCommand = `mkdir -p ${runDir} && cd ${runDir} && echo '${b64Code}' | base64 -d > Main.java && echo '${b64Input}' | base64 -d > input.txt && javac Main.java && java Main < input.txt; status=$?; rm -rf ${runDir}; exit $status`;
   return await runDockerContainer('eclipse-temurin:17-jdk', runCommand, startTime, 'java');
 };
