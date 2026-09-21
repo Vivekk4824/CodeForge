@@ -21,25 +21,6 @@ COPY server/package*.json ./
 RUN npm install --omit=dev
 
 # ============================================================================
-# STAGE 3: Production Full-Stack Backend (API + Built Frontend)
-# ============================================================================
-FROM node:20-alpine AS backend-prod
-
-WORKDIR /app/server
-
-# Copy backend dependencies and code
-COPY --from=backend-builder /app/server/node_modules ./node_modules
-COPY server ./
-
-# Copy built frontend assets
-COPY --from=client-builder /app/client/dist /app/client/dist
-
-ENV NODE_ENV=production
-EXPOSE 5000
-
-CMD ["node", "server.js"]
-
-# ============================================================================
 # STAGE 3: C++ Executor (Warm Pool Container)
 # ============================================================================
 FROM gcc:14-alpine AS cpp-executor
@@ -80,3 +61,26 @@ FROM eclipse-temurin:21-jdk-alpine AS java-executor
 WORKDIR /usr/src/app
 
 CMD ["sh"]
+
+# ============================================================================
+# STAGE 7: Production Full-Stack Backend (API + Built Frontend)
+# Default final target for Render / Railway / Docker builds
+# ============================================================================
+FROM node:20-alpine AS backend-prod
+
+# Install compilers and runtimes for cloud hosting without external Docker daemon
+RUN apk add --no-cache gcc g++ python3 openjdk21-jdk bash
+
+WORKDIR /app/server
+
+# Copy backend dependencies and code
+COPY --from=backend-builder /app/server/node_modules ./node_modules
+COPY server ./
+
+# Copy built frontend assets
+COPY --from=client-builder /app/client/dist /app/client/dist
+
+ENV NODE_ENV=production
+EXPOSE 5000
+
+CMD ["node", "server.js"]

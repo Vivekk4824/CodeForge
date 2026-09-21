@@ -46,37 +46,121 @@ export const executeCodeWithPool = async (language, code, input) => {
 };
 
 /**
- * Direct execution (fallback if pool is unavailable)
+ * Execute code via Piston API (used as a fallback when Docker daemon is unavailable)
  */
-export const executeCodeDirect = async (language, code, input) => {
+export const executeWithPiston = async (language, code, input) => {
   const startTime = Date.now();
+  const PISTON_URL = process.env.PISTON_URL || 'https://emkc.org/api/v2/piston/execute';
+
+  const langMap = {
+    cpp: { name: 'c++', file: 'main.cpp' },
+    python: { name: 'python', file: 'main.py' },
+    javascript: { name: 'javascript', file: 'main.js' },
+    java: { name: 'java', file: 'Main.java' },
+  };
+
+  const targetLang = langMap[language] || { name: language, file: 'main.txt' };
+
   try {
-    switch (language) {
-      case 'cpp':
-        return await executeCpp(code, input, startTime);
-      case 'python':
-        return await executePython(code, input, startTime);
-      case 'javascript':
-        return await executeJavaScript(code, input, startTime);
-      case 'java':
-        return await executeJava(code, input, startTime);
-      default:
-        throw new Error(`Language ${language} is not supported yet.`);
+    const headers = { 'Content-Type': 'application/json' };
+    if (process.env.PISTON_API_KEY) {
+      headers['Authorization'] = process.env.PISTON_API_KEY;
     }
+
+    const response = await axios.post(PISTON_URL, {
+      language: targetLang.name,
+      version: '*',
+      files: [{ name: targetLang.file, content: code }],
+      stdin: input || '',
+      run_timeout: EXECUTION_TIMEOUT,
+      compile_timeout: EXECUTION_TIMEOUT + 5000,
+    }, { headers, timeout: EXECUTION_TIMEOUT + 7000 });
+
+    const data = response.data;
+    const compile = data.compile || {};
+    const run = data.run || {};
+
+    if (compile.code !== undefined && compile.code !== 0) {
+      return {
+        success: false,
+        output: compile.stdout || '',
+        error: compile.stderr || compile.output || 'Compilation Error',
+        executionTime: Date.now() - startTime
+      };
+    }
+
+    const success = run.code === 0;
+    return {
+      success,
+      output: run.stdout || (success ? run.output : ''),
+      error: run.stderr || (!success ? run.output : null),
+      executionTime: Date.now() - startTime
+    };
   } catch (error) {
+    const errMsg = error.response?.data?.message || error.message;
+    console.error('Piston fallback failed:', errMsg);
     return {
       success: false,
       output: null,
-      error: error.message,
+      error: `Execution Error: ${errMsg}`,
       executionTime: Date.now() - startTime
     };
   }
 };
 
 /**
- * Main execution function - routes to pool or direct based on configuration
+ * Direct execution (Docker sandbox with Piston fallback)
+ */
+export const executeCodeDirect = async (language, code, input) => {
+  const startTime = Date.now();
+  const hasDocker = await checkDocker();
+
+  // If Docker is not available on host/container, fall back to Piston
+  if (!hasDocker) {
+    console.log('Docker daemon unavailable. Routing execution to Piston fallback...');
+    return await executeWithPiston(language, code, input);
+  }
+
+  try {
+    let result;
+    switch (language) {
+      case 'cpp':
+        result = await executeCpp(code, input, startTime);
+        break;
+      case 'python':
+        result = await executePython(code, input, startTime);
+        break;
+      case 'javascript':
+        result = await executeJavaScript(code, input, startTime);
+        break;
+      case 'java':
+        result = await executeJava(code, input, startTime);
+        break;
+      default:
+        throw new Error(`Language ${language} is not supported yet.`);
+    }
+
+    // If Docker execution failed due to system/daemon error, try Piston fallback
+    if (result && result.error && (result.error.includes('docker') || result.error.includes('daemon') || result.error.includes('ECONNREFUSED'))) {
+      console.log('Docker daemon error encountered. Trying Piston fallback...');
+      return await executeWithPiston(language, code, input);
+    }
+
+    return result;
+  } catch (error) {
+    console.warn('Direct Docker execution failed, falling back to Piston:', error.message);
+    return await executeWithPiston(language, code, input);
+  }
+};
+
+/**
+ * Main execution function - routes to pool, direct Docker, or Piston
  */
 export const executeCode = async (language, code, input) => {
+  if (process.env.USE_PISTON === 'true') {
+    return await executeWithPiston(language, code, input);
+  }
+
   if (USE_POOL) {
     return await executeCodeWithPool(language, code, input);
   } else {
@@ -84,19 +168,53 @@ export const executeCode = async (language, code, input) => {
   }
 };
 
-const runDockerContainer = async (dockerImage, runCommand, startTime, language) => {
-  const limits = RESOURCE_LIMITS[language] || { memory: '256m', cpus: '1' };
-  return await new Promise((resolve) => {
-    const dockerArgs = [
-      'run', '--rm',
-      '--network', 'none',
-      '--memory', limits.memory,
-      '--cpus', limits.cpus,
-      dockerImage,
-      'sh', '-c', runCommand
-    ];
+let dockerChecked = false;
+let isDockerAvailable = false;
 
-    const runProcess = spawn('docker', dockerArgs);
+const checkDocker = async () => {
+  if (dockerChecked) return isDockerAvailable;
+  if (process.env.DISABLE_DOCKER === 'true' || process.env.USE_DOCKER === 'false') {
+    dockerChecked = true;
+    isDockerAvailable = false;
+    return false;
+  }
+  return new Promise((resolve) => {
+    try {
+      const test = spawn('docker', ['--version']);
+      test.on('error', () => {
+        dockerChecked = true;
+        isDockerAvailable = false;
+        resolve(false);
+      });
+      test.on('close', (code) => {
+        dockerChecked = true;
+        isDockerAvailable = (code === 0);
+        resolve(isDockerAvailable);
+      });
+    } catch (e) {
+      dockerChecked = true;
+      isDockerAvailable = false;
+      resolve(false);
+    }
+  });
+};
+
+const runDockerContainer = async (dockerImage, runCommand, startTime, language) => {
+  const hasDocker = await checkDocker();
+  const limits = RESOURCE_LIMITS[language] || { memory: '256m', cpus: '1' };
+  
+  const executable = hasDocker ? 'docker' : 'sh';
+  const dockerArgs = hasDocker ? [
+    'run', '--rm',
+    '--network', 'none',
+    '--memory', limits.memory,
+    '--cpus', limits.cpus,
+    dockerImage,
+    'sh', '-c', runCommand
+  ] : ['-c', runCommand];
+
+  return await new Promise((resolve) => {
+    const runProcess = spawn(executable, dockerArgs);
     const outputChunks = [];
     const errorChunks = [];
     let outputLength = 0;
@@ -196,7 +314,7 @@ const executeCpp = async (code, input, startTime) => {
 const executePython = async (code, input, startTime) => {
   const b64Code = Buffer.from(code).toString('base64');
   const b64Input = Buffer.from(input || '').toString('base64');
-  const runCommand = `mkdir -p /tmp/run && cd /tmp/run && echo '${b64Code}' | base64 -d > main.py && echo '${b64Input}' | base64 -d > input.txt && python main.py < input.txt`;
+  const runCommand = `mkdir -p /tmp/run && cd /tmp/run && echo '${b64Code}' | base64 -d > main.py && echo '${b64Input}' | base64 -d > input.txt && (command -v python3 >/dev/null && python3 main.py < input.txt || python main.py < input.txt)`;
   return await runDockerContainer('python:3.9-slim', runCommand, startTime, 'python');
 };
 
