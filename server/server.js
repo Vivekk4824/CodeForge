@@ -18,6 +18,7 @@ const __dirname = path.dirname(__filename);
 connectDB();
 
 const app = express();
+app.set('trust proxy', 1);
 
 // Security Middleware (relax CSP so Monaco Editor CDN assets load cleanly)
 app.use(helmet({
@@ -61,8 +62,8 @@ app.get('/api/health', (req, res) => {
 const clientDistPath = path.resolve(__dirname, '../client/dist');
 app.use(express.static(clientDistPath));
 
-// Fallback to client SPA for non-API routes
-app.get('*', (req, res, next) => {
+// Fallback to client SPA for non-API routes (Express 5 compatible)
+app.use((req, res, next) => {
   if (req.path.startsWith('/api')) {
     return next();
   }
