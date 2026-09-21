@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Mail, Key } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { BACKEND_URL } from '../services/api';
 
 export default function LoginModal({ isOpen, onClose }) {
   const [isLogin, setIsLogin] = useState(true);
@@ -20,7 +21,7 @@ export default function LoginModal({ isOpen, onClose }) {
     const body = isLogin ? { email, password } : { name, email, password };
 
     try {
-      const response = await fetch(`http://localhost:5000${endpoint}`, {
+      const response = await fetch(`${BACKEND_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -42,11 +43,11 @@ export default function LoginModal({ isOpen, onClose }) {
   };
 
   const handleGoogleLogin = () => {
-    window.location.href = 'http://localhost:5000/api/auth/google';
+    window.location.href = `${BACKEND_URL}/api/auth/google`;
   };
 
   const handleGithubLogin = () => {
-    window.location.href = 'http://localhost:5000/api/auth/github';
+    window.location.href = `${BACKEND_URL}/api/auth/github`;
   };
 
   return (

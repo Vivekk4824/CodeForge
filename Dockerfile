@@ -1,5 +1,17 @@
 # ============================================================================
-# STAGE 1: Build Backend (Node.js + Dependencies)
+# STAGE 1: Build Frontend (React + Vite)
+# ============================================================================
+FROM node:20-alpine AS client-builder
+
+WORKDIR /app/client
+
+COPY client/package*.json ./
+RUN npm install
+COPY client/ ./
+RUN npm run build
+
+# ============================================================================
+# STAGE 2: Build Backend (Node.js + Dependencies)
 # ============================================================================
 FROM node:20-alpine AS backend-builder
 
@@ -9,15 +21,18 @@ COPY server/package*.json ./
 RUN npm install --omit=dev
 
 # ============================================================================
-# STAGE 2: Production Backend (API Only)
+# STAGE 3: Production Full-Stack Backend (API + Built Frontend)
 # ============================================================================
 FROM node:20-alpine AS backend-prod
 
 WORKDIR /app/server
 
-# Copy dependencies from builder
+# Copy backend dependencies and code
 COPY --from=backend-builder /app/server/node_modules ./node_modules
-COPY server . .
+COPY server ./
+
+# Copy built frontend assets
+COPY --from=client-builder /app/client/dist /app/client/dist
 
 ENV NODE_ENV=production
 EXPOSE 5000

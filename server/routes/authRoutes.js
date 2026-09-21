@@ -18,18 +18,28 @@ router.get('/me', (req, res, next) => {
   protect(req, res, next);
 }, getUserProfile);
 
+const getClientRedirectUrl = () => {
+  return process.env.CLIENT_URL || (process.env.NODE_ENV === 'production' ? '/' : 'http://localhost:5173/');
+};
+
 // Google OAuth
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'], session: false }));
-router.get('/google/callback', passport.authenticate('google', { session: false, failureRedirect: 'http://localhost:5173/' }), (req, res) => {
+router.get('/google/callback', (req, res, next) => {
+  const redirectUrl = getClientRedirectUrl();
+  passport.authenticate('google', { session: false, failureRedirect: redirectUrl })(req, res, next);
+}, (req, res) => {
   generateToken(res, req.user._id);
-  res.redirect('http://localhost:5173/');
+  res.redirect(getClientRedirectUrl());
 });
 
 // GitHub OAuth
 router.get('/github', passport.authenticate('github', { scope: ['user:email'], session: false }));
-router.get('/github/callback', passport.authenticate('github', { session: false, failureRedirect: 'http://localhost:5173/' }), (req, res) => {
+router.get('/github/callback', (req, res, next) => {
+  const redirectUrl = getClientRedirectUrl();
+  passport.authenticate('github', { session: false, failureRedirect: redirectUrl })(req, res, next);
+}, (req, res) => {
   generateToken(res, req.user._id);
-  res.redirect('http://localhost:5173/');
+  res.redirect(getClientRedirectUrl());
 });
 
 export default router;
